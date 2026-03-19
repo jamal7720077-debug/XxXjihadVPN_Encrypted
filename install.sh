@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# XxXjihad VPN Manager (Encrypted Edition) Installer
+# GitHub: https://github.com/jamal7720077-debug/XxXjihadVPN_Encrypted
+
+REPO_RAW="https://raw.githubusercontent.com/jamal7720077-debug/XxXjihadVPN_Encrypted/main"
 XXJIHAD_DIR="/etc/xxjihad"
 XXJIHAD_BIN="/usr/local/bin"
 XXJIHAD_LIB="/usr/local/lib/xxjihad"
@@ -20,10 +24,10 @@ fi
 # Create necessary directories
 mkdir -p "$XXJIHAD_DIR" "$XXJIHAD_LIB"
 
-# Install dependencies for openssl
-msg_info "Installing system dependencies (openssl)..."
+# Install dependencies
+msg_info "Installing system dependencies (openssl, curl, wget)..."
 apt-get update -qq >/dev/null 2>&1
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssl >/dev/null 2>&1
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssl curl wget >/dev/null 2>&1
 
 if ! command -v openssl &>/dev/null; then
     msg_err "Failed to install openssl. Aborting."
@@ -31,17 +35,26 @@ if ! command -v openssl &>/dev/null; then
 fi
 msg_ok "Dependencies installed."
 
-# Copy encryption key
-msg_info "Copying encryption key..."
-cp /home/ubuntu/XxXjihadVPN_encrypted/encryption.key "$ENCRYPTION_KEY_PATH"
+# Download encryption key
+msg_info "Downloading encryption key..."
+if ! wget -q -O "$ENCRYPTION_KEY_PATH" "$REPO_RAW/encryption.key"; then
+    msg_err "Failed to download encryption key. Aborting."
+    exit 1
+fi
 chmod 600 "$ENCRYPTION_KEY_PATH"
-msg_ok "Encryption key copied."
+msg_ok "Encryption key downloaded."
 
-# Copy encrypted library files
-msg_info "Copying encrypted library files..."
-cp /home/ubuntu/XxXjihadVPN_encrypted/lib/*.enc "$XXJIHAD_LIB/"
+# Download encrypted library files
+msg_info "Downloading encrypted library files..."
+MODULES=(dnstt-core.sh.enc net-optimizer.sh.enc user-manager.sh.enc menu-system.sh.enc ssl-tunnel.sh.enc protocols.sh.enc uninstall.sh.enc)
+for mod in "${MODULES[@]}"; do
+    if ! wget -q -O "$XXJIHAD_LIB/$mod" "$REPO_RAW/lib/$mod"; then
+        msg_err "Failed to download module: $mod. Aborting."
+        exit 1
+    fi
+done
 chmod 600 "$XXJIHAD_LIB"/*.enc
-msg_ok "Encrypted library files copied."
+msg_ok "Encrypted library files downloaded."
 
 # Create anti-theft lock file
 msg_info "Creating anti-theft lock file..."
@@ -99,17 +112,21 @@ decrypt_and_source "$XXJIHAD_LIB/user-manager.sh.enc"
 decrypt_and_source "$XXJIHAD_LIB/ssl-tunnel.sh.enc"
 decrypt_and_source "$XXJIHAD_LIB/protocols.sh.enc"
 decrypt_and_source "$XXJIHAD_LIB/menu-system.sh.enc"
+decrypt_and_source "$XXJIHAD_LIB/uninstall.sh.enc"
 
 # Initialize directories (if not already done by installer)
-init_dirs
+# Note: init_dirs must be defined in one of the decrypted modules
+if declare -f init_dirs > /dev/null; then
+    init_dirs
+fi
 
 # Handle arguments
 case "${1:-}" in
     --status)
-        xxjihad_status
+        if declare -f xxjihad_status > /dev/null; then xxjihad_status; else echo "Error: xxjihad_status not found."; fi
         ;;
     --info)
-        show_dnstt_info
+        if declare -f show_dnstt_info > /dev/null; then show_dnstt_info; else echo "Error: show_dnstt_info not found."; fi
         ;;
     --help|-h)
         echo "Usage: xxjihad [option]"
@@ -119,9 +136,9 @@ case "${1:-}" in
         echo "  --help     Show this help"
         ;;
     *)
-        main_menu
+        if declare -f main_menu > /dev/null; then main_menu; else echo "Error: main_menu not found."; fi
         ;;
-	esac
+esac
 EOF
 chmod +x "$XXJIHAD_BIN/xxjihad"
 msg_ok "Main loader script created."
