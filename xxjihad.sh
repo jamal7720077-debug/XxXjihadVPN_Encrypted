@@ -33,13 +33,15 @@ decrypt_and_source() {
         echo -e "\033[38;5;196m[ERROR]\033[0m Encrypted module $encrypted_file not found. Exiting."
         exit 1
     fi
-    # Decrypt and execute in the CURRENT shell environment
-    # Using source /dev/stdin to ensure functions are available in this process
-    source <(openssl enc -aes-256-cbc -d -salt -pbkdf2 -in "$encrypted_file" -k "$ENCRYPTION_KEY" 2>/dev/null)
-    if [[ $? -ne 0 ]]; then
-        echo -e "\033[38;5;196m[ERROR]\033[0m Failed to decrypt or execute $encrypted_file. Exiting."
+    # Decrypt and source in the CURRENT shell environment
+    # Using process substitution to source the decrypted output
+    local decrypted_content
+    decrypted_content=$(openssl enc -aes-256-cbc -d -salt -pbkdf2 -in "$encrypted_file" -k "$ENCRYPTION_KEY" 2>/dev/null)
+    if [[ $? -ne 0 ]] || [[ -z "$decrypted_content" ]]; then
+        echo -e "\033[38;5;196m[ERROR]\033[0m Failed to decrypt $encrypted_file. Exiting."
         exit 1
     fi
+    eval "$decrypted_content"
 }
 
 # Source all modules in correct order
@@ -51,7 +53,7 @@ decrypt_and_source "$XXJIHAD_LIB/protocols.sh.enc"
 decrypt_and_source "$XXJIHAD_LIB/menu-system.sh.enc"
 decrypt_and_source "$XXJIHAD_LIB/uninstall.sh.enc"
 
-# Initialize directories (if not already done by installer)
+# Initialize directories
 if declare -f init_dirs > /dev/null; then
     init_dirs
 fi
@@ -72,6 +74,13 @@ case "${1:-}" in
         echo "  --help     Show this help"
         ;;
     *)
-        if declare -f main_menu > /dev/null; then main_menu; else echo "Error: main_menu not found."; fi
+        if declare -f main_menu > /dev/null; then 
+            main_menu
+        else 
+            echo -e "\033[38;5;196m[ERROR]\033[0m main_menu function not loaded. Checking modules..."
+            # Debug: list loaded functions
+            # declare -F
+            exit 1
+        fi
         ;;
 esac
