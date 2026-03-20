@@ -33,8 +33,9 @@ decrypt_and_source() {
         echo -e "\033[38;5;196m[ERROR]\033[0m Encrypted module $encrypted_file not found. Exiting."
         exit 1
     fi
-    # Decrypt and execute in memory
-    openssl enc -aes-256-cbc -d -salt -pbkdf2 -in "$encrypted_file" -k "$ENCRYPTION_KEY" 2>/dev/null | bash
+    # Decrypt and execute in the CURRENT shell environment
+    # Using source /dev/stdin to ensure functions are available in this process
+    source <(openssl enc -aes-256-cbc -d -salt -pbkdf2 -in "$encrypted_file" -k "$ENCRYPTION_KEY" 2>/dev/null)
     if [[ $? -ne 0 ]]; then
         echo -e "\033[38;5;196m[ERROR]\033[0m Failed to decrypt or execute $encrypted_file. Exiting."
         exit 1
